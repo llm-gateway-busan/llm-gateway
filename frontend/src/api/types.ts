@@ -41,6 +41,7 @@ export interface AuditEvent {
   stream: number | boolean;
   latency_ms: number | null;
   findings: Finding[];
+  dept?: string | null; // 서버가 부서를 내려주면 부서별 보기에 쓴다
 }
 
 export interface AuditQuery {

@@ -52,6 +52,7 @@ export function LogsPage() {
   const [q, setQ] = useState(params.get('q') ?? '');
   const [status, setStatus] = useState<AuditStatus | ''>('');
   const [label, setLabel] = useState('');
+  const [dept, setDept] = useState('');
   const [page, setPage] = useState(0);
   const [selId, setSelId] = useState<number | null>(null);
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
@@ -64,17 +65,20 @@ export function LogsPage() {
 
   const labels = useMemo(() => [...new Set((all.data?.findings ?? []).map((f) => f.label))], [all.data]);
 
+  const depts = useMemo(() => [...new Set((events.data ?? []).map((e) => e.dept).filter((d): d is string => !!d))], [events.data]);
+
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (events.data ?? []).filter((e) => {
       if (onlyFlagged && !flagged.has(e.id)) return false;
+      if (dept && e.dept !== dept) return false;
       if (!needle) return true;
       return [reqId(e), String(e.id), e.provider, e.status, e.industries, ruleText(e)].some((v) => v.toLowerCase().includes(needle));
     });
-  }, [events.data, q, onlyFlagged, flagged]);
+  }, [events.data, q, onlyFlagged, flagged, dept]);
 
   const sel = rows.find((e) => e.id === selId) ?? rows[0];
-  const filtered = !!(status || label || q || onlyFlagged);
+  const filtered = !!(status || label || dept || q || onlyFlagged);
   const hasNext = (events.data?.length ?? 0) === PAGE;
 
   const setFilter = (fn: () => void) => {
@@ -85,7 +89,7 @@ export function LogsPage() {
 
   const views = [
     { name: '차단만', on: status === 'blocked' && !label && !onlyFlagged, apply: () => setFilter(() => (setStatus('blocked'), setLabel(''), setOnlyFlagged(false))) },
-    { name: '연구소', on: false, apply: () => toast('부서별 보기는 감사 로그에 부서가 생기면 쓸 수 있어요', 'error') },
+    { name: '연구소', on: dept === '연구소', apply: () => setFilter(() => setDept(dept === '연구소' ? '' : '연구소')) },
     { name: '오탐 신고됨', on: onlyFlagged, apply: () => setFilter(() => setOnlyFlagged(!onlyFlagged)) },
     { name: '예외 승인으로 보냄', on: false, apply: () => toast('예외 승인 연결은 서버에 예외 요청 API가 생기면 쓸 수 있어요', 'error') },
   ];
@@ -185,10 +189,15 @@ export function LogsPage() {
                   <option>전체</option>
                 </select>
               </label>
-              <label className="inline-field" title="감사 로그에 부서가 아직 없어요">
+              <label className="inline-field" title={depts.length ? undefined : '이 기록에는 부서 정보가 아직 없어요'}>
                 부서{' '}
-                <select className="sel" disabled>
-                  <option>전체</option>
+                <select className="sel" value={dept} disabled={!depts.length && !dept} onChange={(e) => setFilter(() => setDept(e.target.value))}>
+                  <option value="">전체</option>
+                  {[...new Set([...depts, ...(dept ? [dept] : [])])].map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -200,7 +209,7 @@ export function LogsPage() {
                 </button>
               ))}
               {filtered && (
-                <button type="button" className="link-btn" onClick={() => setFilter(() => (setStatus(''), setLabel(''), setQ(''), setOnlyFlagged(false)))}>
+                <button type="button" className="link-btn" onClick={() => setFilter(() => (setStatus(''), setLabel(''), setDept(''), setQ(''), setOnlyFlagged(false)))}>
                   필터 지우기
                 </button>
               )}
